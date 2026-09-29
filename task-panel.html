@@ -1,0 +1,2675 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>任務面板</title>
+<script>
+// 主題初始化（防載入閃光）
+(function () {
+  var saved = null;
+  try { saved = localStorage.getItem('taskPanel.theme'); } catch (e) {}
+  if (saved === 'dark') {
+    document.documentElement.classList.add('dark');
+  }
+})();
+</script>
+<style>
+:root {
+  --bg: #fdf8f0;
+  --surface: #ffffff;
+  --border: #e8e0d4;
+  --accent: #4a6741;
+  --accent-hover: #3d5a35;
+  --accent-light: #e8f0e5;
+  --text: #2c2c2c;
+  --text-muted: #8a8078;
+  --danger: #c44536;
+  --danger-bg: #fde8e6;
+  --danger-bg-strong: #faf0ee;
+  --warning: #d4a017;
+  --warning-bg: #faf6ea;
+  --low: #6b8e6b;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+/* ── 暗色主題（OLED 純黑）── */
+html.dark {
+  --bg: #000000;
+  --surface: #141414;
+  --border: #2e2e2e;
+  --accent: #8fb584;
+  --accent-hover: #a3c797;
+  --accent-light: #1a221a;
+  --text: #e8e6e0;
+  --text-muted: #98928a;
+  --danger: #d4685a;
+  --danger-bg: #2a1a17;
+  --danger-bg-strong: #261512;
+  --warning: #d9b44a;
+  --warning-bg: #26210f;
+  --low: #8fb584;
+  --shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+html.dark input[type="checkbox"] { accent-color: var(--accent); }
+html.dark input[type="date"] { color-scheme: dark; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 24px 20px;
+  line-height: 1.6;
+  font-size: 15px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+h1 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Input Section */
+.input-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;          /* 空間不足時換行，不擠爆 */
+  align-items: center;
+}
+
+.input-row:last-child { margin-bottom: 0; }
+
+/* flex 子項可縮小、不超過容器 */
+.input-row > * { min-width: 0; max-width: 100%; flex-shrink: 1; }
+
+input[type="text"],
+input[type="date"],
+textarea,
+select {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input[type="text"]:focus,
+input[type="date"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+}
+
+input[type="date"] {
+  flex: 0 1 auto;           /* 可縮小 */
+  min-width: 0;             /* 蓋過瀏覽器內建最小寬 */
+  max-width: 100%;
+}
+
+#task-title {
+  flex: 1;
+  min-width: 0;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 36px;
+  font-family: inherit;
+}
+
+select {
+  cursor: pointer;
+}
+
+.btn {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: #fff;
+}
+
+.btn-icon {
+  padding: 6px 10px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Stats Bar */
+#stats-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--accent-light);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+#stats-bar .text-danger {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Filter Section */
+.filter-section {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.filter-section label {
+  color: var(--text-muted);
+  margin-right: 2px;
+}
+
+.filter-section select {
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+/* Task view switch */
+.task-view-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.task-view-btn {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.task-view-btn:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.task-view-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Four-quadrant matrix */
+.matrix-shell {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(210px, 1fr));
+  gap: 10px;
+  min-width: 560px;
+  min-height: 100%;
+  padding: 10px;
+}
+
+.matrix-quadrant {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 210px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--text-muted);
+  border-radius: 4px;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.matrix-quadrant.q-important-urgent { border-top-color: var(--danger); }
+.matrix-quadrant.q-important { border-top-color: var(--accent); }
+.matrix-quadrant.q-urgent { border-top-color: var(--warning); }
+
+.matrix-quadrant.drag-over {
+  background: var(--accent-light);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.matrix-quadrant-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.matrix-quadrant-count {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.matrix-quadrant-tasks {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.matrix-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--text-muted);
+  border-radius: 4px;
+  cursor: grab;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.matrix-card:active { cursor: grabbing; }
+.matrix-card.priority-high { border-left-color: var(--danger); }
+.matrix-card.priority-medium { border-left-color: var(--warning); }
+.matrix-card.priority-low { border-left-color: var(--low); }
+.matrix-card.dragging { opacity: 0.45; transform: scale(0.98); }
+
+.matrix-card .task-check {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+
+.matrix-task-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.matrix-task-title {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.matrix-task-category {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 10px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matrix-empty {
+  padding: 14px 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Task List — 單一容器面板，任務為內部列 */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+/* 細滾動條（WebKit） */
+.task-list::-webkit-scrollbar { width: 6px; }
+.task-list::-webkit-scrollbar-track { background: transparent; }
+.task-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.task-list::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+.task-card {
+  border-bottom: 1px dashed var(--border);
+  border-left: 4px solid var(--text-muted);
+  transition: background 0.2s;
+}
+.task-card:last-child { border-bottom: none; }
+
+.task-card.priority-high { border-left-color: var(--danger); }
+.task-card.priority-medium { border-left-color: var(--warning); }
+.task-card.priority-low { border-left-color: var(--low); }
+
+.task-card.overdue {
+  border-left-color: var(--danger);
+  background: var(--danger-bg-strong);
+}
+
+.task-card.due-today {
+  border-left-color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.task-card.completed {
+  opacity: 0.55;
+}
+
+.task-card.completed .task-title {
+  text-decoration: line-through;
+}
+
+.task-card .card-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.checkbox-wrap {
+  display: flex;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.task-check {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.task-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-title {
+  font-weight: 500;
+  word-break: break-word;
+  margin-bottom: 4px;
+}
+
+.task-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  word-break: break-word;
+}
+
+.task-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.due-date {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.due-date.overdue-date {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.due-date.today-date {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.card-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.task-card:hover .card-actions {
+  opacity: 1;
+}
+
+.btn-edit, .btn-delete {
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+
+.btn-edit:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.btn-delete:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* Inline Edit */
+.edit-input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 4px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  outline: none;
+  background: var(--bg);
+}
+
+.edit-meta-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  align-items: center;
+  flex-wrap: wrap;          /* 空間不足時換行 */
+}
+
+.edit-meta-row select,
+.edit-meta-row input {
+  font-size: 12px;
+  padding: 3px 6px;
+  min-width: 0;
+  max-width: 100%;
+  flex-shrink: 1;
+}
+
+.edit-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.empty-state .empty-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+/* Error Message */
+#error-message {
+  background: var(--danger-bg);
+  color: var(--danger);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: none;
+}
+
+#error-message.show {
+  display: block;
+  animation: slideIn 0.2s ease-out;
+}
+
+/* Animations */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.95); }
+}
+
+.task-card.adding {
+  animation: slideIn 0.2s ease-out;
+}
+
+.task-card.removing {
+  animation: fadeOut 0.2s ease-out forwards;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  body { padding: 16px 12px 16px; }
+  h1 { font-size: 1.2rem; }
+  /* .input-row wrap 已提升為全域規則 */
+  .card-actions { opacity: 1; }
+  .filter-section { gap: 6px; }
+  #stats-bar { gap: 8px; font-size: 12px; }
+  .tab-btn { padding: 8px 12px; font-size: 13px; }
+  .pomo-main { gap: 10px; }
+  .pomo-time { font-size: 2rem; }
+}
+
+/* Pomodoro */
+.pomo-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.pomo-header {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 10px; margin-bottom: 10px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 13px;
+}
+.pomo-title { font-weight: 600; }
+.pomo-phase { color: var(--accent); font-weight: 500; }
+.pomo-rounds { display: flex; gap: 6px; margin-left: auto; align-items: center; }
+.pomo-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 1.5px solid var(--border); display: inline-block;
+}
+.pomo-dot.done { background: var(--accent); border-color: var(--accent); }
+.pomo-dot.current { border-color: var(--accent); animation: pomoPulse 1.5s infinite; }
+@keyframes pomoPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.pomo-main { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.pomo-time {
+  font-size: 2.6rem; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px; color: var(--text);
+}
+.pomo-section.running .pomo-time { color: var(--accent); }
+.pomo-section.on-break .pomo-time { color: var(--low); }
+.pomo-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pomo-settings {
+  display: none; margin-top: 12px; padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  gap: 10px; flex-wrap: wrap; align-items: center;
+  font-size: 13px; color: var(--text-muted);
+}
+.pomo-settings.open { display: flex; }
+.pomo-settings input[type="number"] { width: 56px; padding: 4px 6px; font-size: 13px; }
+/* Focus mode：專注時淡化非目標分類 */
+.task-list.focus-mode .task-card.dimmed { opacity: 0.35; }
+.task-list.focus-mode .task-card.focused-task {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-light);
+}
+
+/* 主題切換按鈕 */
+.theme-toggle {
+  margin-left: auto;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+/* 主題下拉選單 */
+.theme-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 50;
+  min-width: 100px;
+}
+.theme-dropdown.show {
+  display: block;
+}
+.theme-option {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.theme-option:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+.theme-option.active {
+  color: var(--accent);
+  font-weight: 500;
+}
+h1 {
+  position: relative;
+}
+
+/* Tabs */
+.tab-bar {
+  display: flex; gap: 0; margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  font-family: inherit; font-size: 14px;
+  padding: 10px 18px; background: none; border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted); cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn:hover { color: var(--accent); }
+.tab-btn.active {
+  color: var(--accent); font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+.tab-page { display: none; }
+/* 待辦分頁：固定頭部（輸入/統計/篩選），列表獨立滾動 */
+#tab-tasks.active {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+/* 番茄鐘分頁：內容短，整頁滾動即可 */
+#tab-pomo.active {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* 迷你計時列：待辦分頁 + 計時進行中時顯示 */
+#mini-timer {
+  display: none;
+  align-items: center; gap: 8px;
+  font-size: 13px; color: var(--accent);
+  padding: 6px 12px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+#mini-timer.show { display: flex; }
+#mini-timer .mini-time { font-weight: 700; font-size: 15px; }
+
+/* Pomo Summary */
+.pomo-summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.summary-title {
+  font-weight: 600; font-size: 14px;
+  padding-bottom: 8px; margin-bottom: 8px;
+  border-bottom: 1px dashed var(--border);
+}
+.summary-total { font-size: 13px; color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+.summary-row {
+  display: flex; justify-content: space-between;
+  font-size: 13px; color: var(--text-muted);
+  padding: 4px 0;
+  border-bottom: 1px dotted var(--border);
+}
+.summary-row:last-child { border-bottom: none; }
+.summary-empty { font-size: 13px; color: var(--text-muted); text-align: center; padding: 16px 0; }
+
+/* 佈局包裝層：分頁各自獨立，維持文件流 */
+.app-columns { display: contents; }
+
+/* Confirm Modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(44, 44, 44, 0.35);
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  max-width: 360px; width: 100%;
+  padding: 20px;
+  animation: modalIn 0.15s ease-out;
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.modal-title {
+  font-weight: 600; font-size: 15px;
+  margin-bottom: 8px;
+}
+.modal-text {
+  font-size: 14px; color: var(--text-muted);
+  margin-bottom: 18px;
+  word-break: break-word;
+}
+.modal-text .modal-highlight {
+  color: var(--text); font-weight: 500;
+}
+.modal-actions {
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+
+/* ── Calendar Module ── */
+.calendar-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.calendar-title {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-right: auto;
+}
+
+.calendar-nav-btn { padding: 6px 12px; font-size: 14px; }
+.calendar-today-btn { padding: 6px 12px; font-size: 13px; }
+.calendar-view-toggle { padding: 6px 12px; font-size: 13px; margin-left: 8px; }
+
+.calendar-week-container { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.calendar-week-header { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--border); border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; background: var(--accent-light); }
+.calendar-week-header-cell { padding: 10px 8px; text-align: center; border-right: 1px dashed var(--border); font-size: 12px; font-weight: 500; }
+.calendar-week-header-cell:last-child { border-right: none; }
+.calendar-week-header-cell.today { background: var(--accent); color: #fff; }
+.calendar-week-body { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); flex: 1; min-height: 200px; overflow: hidden; }
+.calendar-day-cell { border-right: 1px dashed var(--border); border-bottom: 1px dashed var(--border); padding: 8px; min-height: 100px; overflow-y: auto; background: var(--surface); cursor: pointer; transition: background 0.15s; }
+.calendar-day-cell:nth-child(7n) { border-right: none; }
+.calendar-day-cell:nth-last-child(-n+7) { border-bottom: none; }
+.calendar-day-cell:hover { background: var(--accent-light); }
+.calendar-day-cell.today { background: var(--accent-light); }
+.calendar-day-cell.other-month { background: var(--bg); opacity: 0.6; }
+.calendar-day-cell.drag-over { background: var(--warning-bg); box-shadow: inset 0 0 0 2px var(--accent); }
+.calendar-day-number { font-weight: 500; font-size: 13px; margin-bottom: 6px; color: var(--text-muted); }
+.calendar-day-cell.today .calendar-day-number { color: var(--accent); font-weight: 700; }
+
+.cal-task { background: var(--bg); border-radius: 4px; padding: 4px 8px; margin-bottom: 4px; font-size: 12px; cursor: grab; border-left: 3px solid var(--text-muted); word-break: break-word; transition: opacity 0.15s, transform 0.15s; position: relative; }
+.cal-task:active { cursor: grabbing; }
+.cal-task.priority-high { border-left-color: var(--danger); }
+.cal-task.priority-medium { border-left-color: var(--warning); }
+.cal-task.priority-low { border-left-color: var(--low); }
+.cal-task.completed { opacity: 0.5; text-decoration: line-through; }
+.cal-task.overdue { background: var(--danger-bg-strong); }
+.cal-task.due-today { background: var(--warning-bg); }
+.cal-task.dragging { opacity: 0.5; transform: scale(0.95); }
+
+.calendar-month-container { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.calendar-month-header { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--border); border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; background: var(--accent-light); }
+.calendar-month-header-cell { padding: 8px 6px; text-align: center; font-size: 11px; font-weight: 500; color: var(--text-muted); }
+.calendar-month-body { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(6, 1fr); border: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); flex: 1; min-height: 300px; }
+.calendar-month-day { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 6px; cursor: pointer; transition: background 0.15s; overflow: hidden; }
+.calendar-month-day:nth-child(7n) { border-right: none; }
+.calendar-month-day:nth-last-child(-n+7) { border-bottom: none; }
+.calendar-month-day:hover { background: var(--accent-light); }
+.calendar-month-day.today { background: var(--accent-light); }
+.calendar-month-day.other-month { background: var(--bg); opacity: 0.5; }
+.calendar-month-day.drag-over { background: var(--warning-bg); box-shadow: inset 0 0 0 2px var(--accent); }
+.calendar-month-date { font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--text-muted); }
+.calendar-month-day.today .calendar-month-date { color: var(--accent); font-weight: 700; }
+.calendar-month-tasks { font-size: 11px; }
+.cal-month-task-item { background: var(--bg); border-radius: 3px; padding: 2px 6px; margin-bottom: 2px; border-left: 2px solid var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grab; }
+.cal-month-task-item.priority-high { border-left-color: var(--danger); }
+.cal-month-task-item.priority-medium { border-left-color: var(--warning); }
+.cal-month-task-item.priority-low { border-left-color: var(--low); }
+.cal-month-task-item.completed { opacity: 0.5; text-decoration: line-through; }
+.cal-month-more { font-size: 10px; color: var(--text-muted); font-style: italic; }
+
+.cal-quick-add { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 16px; z-index: 200; width: 280px; max-width: 90vw; display: none; }
+.cal-quick-add.show { display: block; animation: modalIn 0.15s ease-out; }
+.cal-quick-add-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.cal-quick-add-title { font-weight: 600; font-size: 14px; }
+.cal-quick-add-close { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-muted); padding: 0; line-height: 1; }
+.cal-quick-add-close:hover { color: var(--text); }
+.cal-quick-add input[type="text"] { width: 100%; margin-bottom: 8px; }
+.cal-quick-add select { width: 100%; margin-bottom: 8px; }
+.cal-quick-add-date { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+
+.cal-context-menu { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 300; min-width: 140px; display: none; }
+.cal-context-menu.show { display: block; animation: modalIn 0.1s ease-out; }
+.cal-context-item { display: block; width: 100%; padding: 10px 14px; background: none; border: none; text-align: left; font-size: 13px; color: var(--text); cursor: pointer; transition: background 0.15s; }
+.cal-context-item:hover { background: var(--accent-light); color: var(--accent); }
+.cal-context-item:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+.cal-context-item:last-child { border-radius: 0 0 var(--radius) var(--radius); }
+.cal-context-item.danger:hover { background: var(--danger-bg); color: var(--danger); }
+
+.cal-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); z-index: 400; font-size: 13px; display: none; }
+.cal-toast.show { display: block; animation: slideUp 0.2s ease-out; }
+@keyframes slideUp { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+#tab-calendar.active { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+@media (max-width: 600px) {
+  .calendar-week-header-cell { padding: 8px 4px; font-size: 11px; }
+  .calendar-day-cell { padding: 6px; min-height: 80px; }
+  .cal-task { font-size: 11px; padding: 3px 6px; }
+  .calendar-header { gap: 6px; }
+  .calendar-nav-btn { padding: 6px 10px; }
+}</style>
+</head>
+<body>
+
+<h1>任務面板
+  <button class="btn btn-icon theme-toggle" id="theme-toggle" title="選擇主題">深色 ▾</button>
+  <div class="theme-dropdown" id="theme-dropdown">
+    <button class="theme-option" data-theme="light">淺色</button>
+    <button class="theme-option" data-theme="dark">深色</button>
+  </div>
+</h1>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-btn-tasks" data-tab="tasks">待辦事項</button>
+  <button class="tab-btn" id="tab-btn-pomo" data-tab="pomo">番茄鐘</button>
+  <button class="tab-btn" id="tab-btn-calendar" data-tab="calendar">日曆</button>
+</div>
+
+<!-- Mini Timer（待辦分頁 + 計時中顯示） -->
+<div id="mini-timer" title="按此回到番茄鐘分頁">
+  <span class="mini-time" id="mini-time">25:00</span>
+  <span id="mini-phase">專注</span>
+</div>
+
+<div class="app-columns">
+
+<!-- Tab: Tasks -->
+<div class="tab-page active" id="tab-tasks">
+
+<!-- Input Section -->
+<div class="input-section">
+  <div id="error-message"></div>
+  <div class="input-row">
+    <input type="text" id="task-title" placeholder="輸入任務標題...（按 Enter 新增）" maxlength="100">
+    <button class="btn btn-primary" id="add-task-btn">新增</button>
+  </div>
+  <div class="input-row">
+    <select id="task-category">
+      <option value="未分類">未分類</option>
+      <option value="工作">工作</option>
+      <option value="生活">生活</option>
+      <option value="學習">學習</option>
+      <option value="健康">健康</option>
+    </select>
+    <select id="task-priority">
+      <option value="high">高優先</option>
+      <option value="medium" selected>中優先</option>
+      <option value="low">低優先</option>
+    </select>
+    <input type="date" id="task-due-date">
+  </div>
+</div>
+
+<!-- Stats Bar -->
+<div id="stats-bar"></div>
+
+<!-- Task View Switch -->
+<div class="task-view-switch" role="group" aria-label="任務顯示方式">
+  <button class="task-view-btn active" data-task-view="list" aria-pressed="true">清單</button>
+  <button class="task-view-btn" data-task-view="matrix" aria-pressed="false">四象限</button>
+</div>
+
+<!-- Filter Section -->
+<div class="filter-section" id="filter-section">
+  <label>分類：</label>
+  <select id="filter-category">
+    <option value="全部">全部</option>
+  </select>
+  <label>狀態：</label>
+  <select id="filter-status">
+    <option value="全部">全部</option>
+    <option value="進行中">進行中</option>
+    <option value="已完成">已完成</option>
+  </select>
+  <label>優先：</label>
+  <select id="filter-priority">
+    <option value="全部">全部</option>
+    <option value="高">高</option>
+    <option value="中">中</option>
+    <option value="低">低</option>
+  </select>
+  <span style="flex:1"></span>
+  <label>排序：</label>
+  <select id="sort-by">
+    <option value="建立時間">建立時間</option>
+    <option value="到期日">到期日</option>
+    <option value="優先級">優先級</option>
+  </select>
+  <button class="btn btn-icon" id="sort-order" data-order="desc">↓ 降序</button>
+</div>
+
+<!-- Four-Quadrant Matrix -->
+<div class="matrix-shell" id="matrix-container"></div>
+
+<!-- Task List -->
+<div class="task-list" id="task-list"></div>
+
+</div><!-- /tab-tasks -->
+
+<!-- Tab: Pomodoro -->
+<div class="tab-page" id="tab-pomo">
+
+<!-- Pomodoro Section -->
+<div class="pomo-section" id="pomo-section">
+  <div class="pomo-header">
+    <span class="pomo-title">番茄鐘</span>
+    <span class="pomo-phase" id="pomo-phase">待機</span>
+    <span class="pomo-rounds" id="pomo-rounds"></span>
+    <button class="btn btn-icon" id="pomo-settings-btn" title="設定">設定</button>
+  </div>
+  <div class="pomo-main">
+    <div class="pomo-time" id="pomo-time">25:00</div>
+    <div class="pomo-controls">
+      <select id="pomo-category" title="專注任務類型"></select>
+      <button class="btn btn-primary" id="pomo-toggle">開始</button>
+      <button class="btn" id="pomo-skip">跳過</button>
+      <button class="btn" id="pomo-reset">重置</button>
+    </div>
+  </div>
+  <div class="pomo-settings" id="pomo-settings">
+    <label>專注 <input type="number" id="pomo-focus-min" min="1" max="120"> 分</label>
+    <label>休息 <input type="number" id="pomo-break-min" min="1" max="60"> 分</label>
+    <label>長休息 <input type="number" id="pomo-longbreak-min" min="1" max="60"> 分</label>
+    <label>輪數 <input type="number" id="pomo-rounds" min="1" max="12"> 輪</label>
+    <label><input type="checkbox" id="pomo-sound"> 音效</label>
+    <button class="btn" id="pomo-save-settings">儲存設定</button>
+  </div>
+</div>
+
+<div id="pomo-summary"></div>
+
+</div><!-- /tab-pomo -->
+<!-- Tab: Calendar -->
+<div class="tab-page" id="tab-calendar">
+  <div class="calendar-section">
+    <div class="calendar-header">
+      <span class="calendar-title" id="cal-title">2026年9月</span>
+      <button class="btn calendar-nav-btn" id="cal-prev" title="上一個期間">‹</button>
+      <button class="btn calendar-nav-btn" id="cal-next" title="下一個期間">›</button>
+      <button class="btn calendar-today-btn" id="cal-today">今天</button>
+      <button class="btn calendar-view-toggle" id="cal-view-toggle">切換月視圖</button>
+    </div>
+    <div class="calendar-week-container" id="calendar-week-container"></div>
+    <div class="calendar-month-container" id="calendar-month-container" style="display:none;"></div>
+  </div>
+</div><!-- /tab-calendar -->
+
+<!-- Calendar Quick Add Popup -->
+<div class="cal-quick-add" id="cal-quick-add">
+  <div class="cal-quick-add-header">
+    <span class="cal-quick-add-title">快速新增任務</span>
+    <button class="cal-quick-add-close" id="cal-quick-add-close">&times;</button>
+  </div>
+  <input type="text" id="cal-quick-title" placeholder="任務標題..." maxlength="100">
+  <select id="cal-quick-category"></select>
+  <div class="cal-quick-add-date" id="cal-quick-date"></div>
+  <div style="display:flex;gap:8px;">
+    <button class="btn btn-primary" id="cal-quick-add-btn" style="flex:1;">新增</button>
+    <button class="btn" id="cal-quick-cancel">取消</button>
+  </div>
+</div>
+
+<!-- Calendar Context Menu -->
+<div class="cal-context-menu" id="cal-context-menu">
+  <button class="cal-context-item" id="cal-ctx-complete">標記完成</button>
+  <button class="cal-context-item" id="cal-ctx-edit">編輯</button>
+  <button class="cal-context-item danger" id="cal-ctx-delete">刪除</button>
+</div>
+
+<!-- Calendar Toast -->
+<div class="cal-toast" id="cal-toast"></div>
+
+
+</div><!-- /app-columns -->
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">確認</div>
+    <div class="modal-text" id="modal-text"></div>
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">取消</button>
+      <button class="btn btn-primary" id="modal-confirm">刪除</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'taskPanel.tasks';
+const DEFAULT_CATEGORIES = ['未分類', '工作', '生活', '學習', '健康'];
+
+let tasks = [];
+let currentFilters = {
+  category: '全部',
+  status: '全部',
+  priority: '全部'
+};
+let sortBy = '建立時間';
+let sortOrder = 'desc';
+const TASK_VIEW_KEY = 'taskPanel.taskView';
+let taskViewMode = 'list';
+
+// ── Storage Layer ──
+
+function loadTasks() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error('任務資料格式錯誤');
+    const needsMigration = parsed.some(task =>
+      typeof task.isImportant !== 'boolean' || typeof task.isUrgent !== 'boolean'
+    );
+    parsed.forEach(normalizeQuadrant);
+    if (needsMigration) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed)); } catch (e) {}
+    }
+    return parsed;
+  } catch (e) {
+    console.error('資料損壞，已重置', e);
+    return [];
+  }
+}
+
+function saveTasks(taskList) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(taskList));
+  } catch (e) {
+    showError('無法儲存任務，請清理瀏覽器資料空間');
+  }
+}
+
+// ── Utility ──
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function today() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function parseDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function isOverdue(dueDate) {
+  const due = parseDate(dueDate);
+  if (!due) return false;
+  return due < today();
+}
+
+function isDueToday(dueDate) {
+  const due = parseDate(dueDate);
+  if (!due) return false;
+  return due.getTime() === today().getTime();
+}
+
+function formatDueDate(dueDate) {
+  if (!dueDate) return '';
+  const d = new Date(dueDate);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  if (isOverdue(dueDate)) return `${mm}/${dd} (已逾期)`;
+  if (isDueToday(dueDate)) return `${mm}/${dd} (今天)`;
+  return `${mm}/${dd}`;
+}
+
+function getCategories() {
+  const cats = new Set(DEFAULT_CATEGORIES);
+  tasks.forEach(t => cats.add(t.category));
+  return [...cats];
+}
+
+function normalizeQuadrant(task) {
+  if (typeof task.isImportant !== 'boolean') {
+    task.isImportant = task.priority === 'high' || task.priority === 'medium';
+  }
+  if (typeof task.isUrgent !== 'boolean') {
+    task.isUrgent = task.priority === 'high';
+  }
+}
+
+function loadTaskView() {
+  try {
+    const saved = localStorage.getItem(TASK_VIEW_KEY);
+    taskViewMode = saved === 'matrix' ? 'matrix' : 'list';
+  } catch (e) {
+    taskViewMode = 'list';
+  }
+}
+
+function saveTaskView() {
+  try {
+    localStorage.setItem(TASK_VIEW_KEY, taskViewMode);
+  } catch (e) {}
+}
+
+// ── Theme ──
+
+const THEME_KEY = 'taskPanel.theme';
+let themeMode = 'light'; // 'light' | 'dark'
+
+function applyTheme() {
+  const dark = themeMode === 'dark';
+  document.documentElement.classList.toggle('dark', dark);
+  const btn = document.getElementById('theme-toggle');
+  if (btn) {
+    btn.textContent = dark ? '淺色 ▾' : '深色 ▾';
+  }
+  // 更新選單選項的 active 狀態
+  document.querySelectorAll('.theme-option').forEach(opt => {
+    opt.classList.toggle('active', opt.dataset.theme === themeMode);
+  });
+}
+
+function setTheme(theme) {
+  if (!['light', 'dark'].includes(theme)) return;
+  themeMode = theme;
+  try { localStorage.setItem(THEME_KEY, themeMode); } catch (e) {}
+  applyTheme();
+}
+
+function toggleThemeDropdown() {
+  const dropdown = document.getElementById('theme-dropdown');
+  dropdown.classList.toggle('show');
+}
+
+function closeThemeDropdown(e) {
+  const dropdown = document.getElementById('theme-dropdown');
+  const btn = document.getElementById('theme-toggle');
+  if (!dropdown) return;
+  // 點擊按鈕或選單內部不關閉
+  if (e.target === btn || dropdown.contains(e.target)) return;
+  dropdown.classList.remove('show');
+}
+
+function initTheme() {
+  try { themeMode = localStorage.getItem(THEME_KEY) || 'light'; } catch (e) {}
+  if (!['light', 'dark'].includes(themeMode)) themeMode = 'light';
+  applyTheme();
+  
+  // 按鈕點擊切換選單
+  document.getElementById('theme-toggle').addEventListener('click', toggleThemeDropdown);
+  
+  // 選單選項點擊
+  document.querySelectorAll('.theme-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      setTheme(opt.dataset.theme);
+      document.getElementById('theme-dropdown').classList.remove('show');
+    });
+  });
+  
+  // 點擊外部關閉選單
+  document.addEventListener('click', closeThemeDropdown);
+}
+
+// ── Confirm Modal ──
+
+let modalResolve = null;
+
+function showConfirm(title, textHTML, confirmLabel) {
+  return new Promise(resolve => {
+    modalResolve = resolve;
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-text').innerHTML = textHTML;
+    document.getElementById('modal-confirm').textContent = confirmLabel || '確認';
+    document.getElementById('modal-overlay').classList.add('show');
+    document.getElementById('modal-cancel').focus();
+  });
+}
+
+function closeModal(result) {
+  const overlay = document.getElementById('modal-overlay');
+  if (!overlay.classList.contains('show')) return;
+  overlay.classList.remove('show');
+  if (modalResolve) { modalResolve(result); modalResolve = null; }
+}
+
+function bindModalEvents() {
+  document.getElementById('modal-cancel').addEventListener('click', () => closeModal(false));
+  document.getElementById('modal-confirm').addEventListener('click', () => closeModal(true));
+  document.getElementById('modal-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeModal(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal(false);
+    if (e.key === 'Enter' && document.getElementById('modal-overlay').classList.contains('show')) {
+      e.preventDefault();
+      closeModal(true);
+    }
+  });
+}
+
+// ── Error Display ──
+
+let errorTimer = null;
+function showError(msg) {
+  const el = document.getElementById('error-message');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(errorTimer);
+  errorTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── Add Task ──
+
+function addTask() {
+  const titleEl = document.getElementById('task-title');
+  const categoryEl = document.getElementById('task-category');
+  const priorityEl = document.getElementById('task-priority');
+  const dueDateEl = document.getElementById('task-due-date');
+
+  const title = titleEl.value.trim();
+  if (!title) {
+    showError('請輸入任務標題');
+    titleEl.focus();
+    return;
+  }
+
+  const task = {
+    id: uid(),
+    title: title,
+    category: categoryEl.value,
+    priority: priorityEl.value,
+    dueDate: dueDateEl.value || formatDateKey(new Date()),
+    completed: false,
+    isImportant: priorityEl.value === 'high' || priorityEl.value === 'medium',
+    isUrgent: priorityEl.value === 'high',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  tasks.push(task);
+  saveTasks(tasks);
+
+  titleEl.value = '';
+  dueDateEl.value = '';
+  titleEl.focus();
+  refreshView();
+  document.getElementById('task-list').scrollTop = 0;
+}
+
+// ── Toggle Complete ──
+
+function toggleComplete(taskId) {
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+  task.completed = !task.completed;
+  task.updatedAt = new Date().toISOString();
+  saveTasks(tasks);
+  refreshView();
+}
+
+// ── Delete Task ──
+
+async function deleteTask(taskId) {
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+  const ok = await showConfirm(
+    '刪除任務',
+    `確定要刪除「<span class="modal-highlight">${escapeHtml(task.title)}</span>」嗎？此操作無法復原。`,
+    '刪除'
+  );
+  if (!ok) return;
+
+  const card = document.querySelector(`[data-id="${taskId}"]`);
+  if (card) {
+    card.classList.add('removing');
+    setTimeout(() => {
+      tasks = tasks.filter(t => t.id !== taskId);
+      saveTasks(tasks);
+      refreshView();
+    }, 200);
+  } else {
+    tasks = tasks.filter(t => t.id !== taskId);
+    saveTasks(tasks);
+    refreshView();
+  }
+}
+
+// ── Edit Task (inline) ──
+
+function enterEditMode(taskId) {
+  const card = document.querySelector(`[data-id="${taskId}"]`);
+  if (!card || card.classList.contains('editing')) return;
+
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  card.classList.add('editing');
+  const body = card.querySelector('.task-body');
+  body.innerHTML = `
+    <input type="text" class="edit-input" value="${escapeHtml(task.title)}" data-field="title">
+    <div class="edit-meta-row">
+      <select data-field="category">
+        ${getCategories().map(c => `<option value="${c}" ${c === task.category ? 'selected' : ''}>${c}</option>`).join('')}
+      </select>
+      <select data-field="priority">
+        <option value="high" ${task.priority === 'high' ? 'selected' : ''}>高</option>
+        <option value="medium" ${task.priority === 'medium' ? 'selected' : ''}>中</option>
+        <option value="low" ${task.priority === 'low' ? 'selected' : ''}>低</option>
+      </select>
+      <input type="date" data-field="dueDate" value="${task.dueDate || ''}">
+    </div>
+    <div class="edit-actions">
+      <button class="btn btn-primary save-edit-btn">儲存</button>
+      <button class="btn cancel-edit-btn">取消</button>
+    </div>
+  `;
+
+  const titleInput = body.querySelector('[data-field="title"]');
+  titleInput.focus();
+  titleInput.select();
+
+  // Save
+  body.querySelector('.save-edit-btn').addEventListener('click', () => saveEdit(taskId));
+  // Cancel
+  body.querySelector('.cancel-edit-btn').addEventListener('click', () => refreshView());
+  // Enter to save
+  titleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveEdit(taskId);
+    if (e.key === 'Escape') refreshView();
+  });
+}
+
+function saveEdit(taskId) {
+  const card = document.querySelector(`[data-id="${taskId}"]`);
+  if (!card) return;
+
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+
+  const newTitle = card.querySelector('[data-field="title"]').value.trim();
+  if (!newTitle) {
+    showError('任務標題不能空白');
+    return;
+  }
+
+  task.title = newTitle;
+  task.category = card.querySelector('[data-field="category"]').value;
+  task.priority = card.querySelector('[data-field="priority"]').value;
+  task.dueDate = card.querySelector('[data-field="dueDate"]').value || null;
+  task.updatedAt = new Date().toISOString();
+
+  saveTasks(tasks);
+  refreshView();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ── Filter & Sort ──
+
+function filterTasks(taskList) {
+  return taskList.filter(t => {
+    if (currentFilters.category !== '全部' && t.category !== currentFilters.category) return false;
+    if (currentFilters.status === '進行中' && t.completed) return false;
+    if (currentFilters.status === '已完成' && !t.completed) return false;
+    if (currentFilters.priority !== '全部') {
+      const map = { '高': 'high', '中': 'medium', '低': 'low' };
+      if (t.priority !== map[currentFilters.priority]) return false;
+    }
+    return true;
+  });
+}
+
+function sortTasks(taskList) {
+  const priorityWeight = { high: 0, medium: 1, low: 2 };
+  return [...taskList].sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    let cmp = 0;
+    if (sortBy === '建立時間') cmp = new Date(a.createdAt) - new Date(b.createdAt);
+    else if (sortBy === '到期日') cmp = (a.dueDate || '9999').localeCompare(b.dueDate || '9999');
+    else if (sortBy === '優先級') cmp = priorityWeight[a.priority] - priorityWeight[b.priority];
+    return sortOrder === 'asc' ? cmp : -cmp;
+  });
+}
+
+// ── Render ──
+
+function renderTasks(taskList) {
+  const container = document.getElementById('task-list');
+  container.classList.toggle('focus-mode', pomo.phase === 'focus');
+
+  if (taskList.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div>${tasks.length === 0 ? '目前沒有任務，新增一個吧' : '沒有符合篩選條件的任務'}</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = taskList.map(task => {
+    const classes = ['task-card', `priority-${task.priority}`];
+    if (task.completed) classes.push('completed');
+    if (isOverdue(task.dueDate) && !task.completed) classes.push('overdue');
+    if (isDueToday(task.dueDate) && !task.completed) classes.push('due-today');
+    if (pomo.phase === 'focus' && !task.completed) {
+      classes.push(task.category === pomo.category ? 'focused-task' : 'dimmed');
+    }
+
+    const dateClass = isOverdue(task.dueDate) && !task.completed ? 'overdue-date' :
+                      isDueToday(task.dueDate) && !task.completed ? 'today-date' : '';
+
+    return `
+      <div class="${classes.join(' ')}" data-id="${task.id}" data-priority="${task.priority}" data-category="${escapeHtml(task.category)}">
+        <div class="card-content">
+          <label class="checkbox-wrap">
+            <input type="checkbox" class="task-check" ${task.completed ? 'checked' : ''}>
+          </label>
+          <div class="task-body">
+            <div class="task-title">${escapeHtml(task.title)}</div>
+            <div class="task-meta">
+              <span class="tag category">${escapeHtml(task.category)}</span>
+              ${task.dueDate ? `<span class="due-date ${dateClass}">${formatDueDate(task.dueDate)}</span>` : ''}
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="btn-edit" title="編輯">編輯</button>
+            <button class="btn-delete" title="刪除">刪除</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Bind events via delegation
+  container.querySelectorAll('.task-check').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const card = e.target.closest('.task-card');
+      toggleComplete(card.dataset.id);
+    });
+  });
+  container.querySelectorAll('.btn-edit').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const card = e.target.closest('.task-card');
+      enterEditMode(card.dataset.id);
+    });
+  });
+  container.querySelectorAll('.btn-delete').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const card = e.target.closest('.task-card');
+      deleteTask(card.dataset.id);
+    });
+  });
+}
+
+function renderTaskView() {
+  const isMatrix = taskViewMode === 'matrix';
+  const list = document.getElementById('task-list');
+  const matrix = document.getElementById('matrix-container');
+  const filter = document.getElementById('filter-section');
+
+  document.querySelectorAll('.task-view-btn').forEach(btn => {
+    const active = btn.dataset.taskView === taskViewMode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+
+  list.style.display = isMatrix ? 'none' : 'flex';
+  matrix.style.display = isMatrix ? 'grid' : 'none';
+  filter.style.display = isMatrix ? 'none' : 'flex';
+
+  if (isMatrix) {
+    renderMatrixView();
+    return;
+  }
+
+  renderTasks(sortTasks(filterTasks(tasks)));
+}
+
+function renderMatrixView() {
+  const container = document.getElementById('matrix-container');
+  const todayKey = formatDateKey(new Date());
+  const quadrants = [
+    { important: true, urgent: true, title: '重要且緊急', className: 'q-important-urgent' },
+    { important: true, urgent: false, title: '重要不緊急', className: 'q-important' },
+    { important: false, urgent: true, title: '不重要但緊急', className: 'q-urgent' },
+    { important: false, urgent: false, title: '不重要不緊急', className: 'q-not-important' }
+  ];
+  const todayTasks = tasks.filter(task => !task.completed && task.dueDate === todayKey);
+
+  container.innerHTML = `
+    <div class="matrix-grid">
+      ${quadrants.map(quadrant => {
+        const quadrantTasks = todayTasks.filter(task =>
+          task.isImportant === quadrant.important && task.isUrgent === quadrant.urgent
+        );
+        const taskHtml = quadrantTasks.length
+          ? quadrantTasks.map(task => `
+            <div class="matrix-card priority-${task.priority}" draggable="true" data-task-id="${escapeHtml(task.id)}">
+              <label class="checkbox-wrap">
+                <input type="checkbox" class="matrix-task-check" aria-label="完成 ${escapeHtml(task.title)}">
+              </label>
+              <div class="matrix-task-body">
+                <div class="matrix-task-title">${escapeHtml(task.title)}</div>
+                <span class="matrix-task-category">${escapeHtml(task.category)}</span>
+              </div>
+            </div>
+          `).join('')
+          : '<div class="matrix-empty">尚無任務</div>';
+
+        return `
+          <section class="matrix-quadrant ${quadrant.className}"
+            data-important="${quadrant.important}"
+            data-urgent="${quadrant.urgent}">
+            <div class="matrix-quadrant-header">
+              <span>${quadrant.title}</span>
+              <span class="matrix-quadrant-count">${quadrantTasks.length}</span>
+            </div>
+            <div class="matrix-quadrant-tasks">${taskHtml}</div>
+          </section>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  bindMatrixEvents(container);
+}
+
+function bindMatrixEvents(container) {
+  container.querySelectorAll('.matrix-quadrant').forEach(quadrant => {
+    quadrant.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      quadrant.classList.add('drag-over');
+    });
+
+    quadrant.addEventListener('dragleave', e => {
+      if (!quadrant.contains(e.relatedTarget)) quadrant.classList.remove('drag-over');
+    });
+
+    quadrant.addEventListener('drop', e => {
+      e.preventDefault();
+      quadrant.classList.remove('drag-over');
+      const taskId = draggedTaskId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+      if (taskId) {
+        moveTaskToQuadrant(
+          taskId,
+          quadrant.dataset.important === 'true',
+          quadrant.dataset.urgent === 'true'
+        );
+      }
+      draggedTaskId = null;
+    });
+  });
+
+  container.querySelectorAll('.matrix-card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      draggedTaskId = card.dataset.taskId;
+      card.classList.add('dragging');
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', card.dataset.taskId);
+      }
+    });
+
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      draggedTaskId = null;
+      container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    });
+  });
+
+  container.querySelectorAll('.matrix-task-check').forEach(checkbox => {
+    checkbox.addEventListener('change', e => {
+      const card = e.target.closest('.matrix-card');
+      if (card) toggleComplete(card.dataset.taskId);
+    });
+  });
+}
+
+function moveTaskToQuadrant(taskId, isImportant, isUrgent) {
+  const task = tasks.find(item => item.id === taskId);
+  if (!task) return;
+  if (task.isImportant === isImportant && task.isUrgent === isUrgent) return;
+
+  task.isImportant = isImportant;
+  task.isUrgent = isUrgent;
+  task.updatedAt = new Date().toISOString();
+  saveTasks(tasks);
+  refreshView();
+}
+
+function setTaskView(mode) {
+  if (!['list', 'matrix'].includes(mode) || taskViewMode === mode) return;
+  taskViewMode = mode;
+  saveTaskView();
+  refreshView();
+}
+
+function renderStats(taskList) {
+  const total = taskList.length;
+  const done = taskList.filter(t => t.completed).length;
+  const overdue = taskList.filter(t => !t.completed && isOverdue(t.dueDate)).length;
+  const pct = total ? Math.round(done / total * 100) : 0;
+
+  const todayKey = new Date().toDateString();
+  const todayFocusMin = pomoLog
+    .filter(l => new Date(l.endedAt).toDateString() === todayKey)
+    .reduce((s, l) => s + l.minutes, 0);
+
+  document.getElementById('stats-bar').innerHTML = `
+    <span>共 ${total} 筆</span>
+    <span>已完成 ${done} (${pct}%)</span>
+    <span>進行中 ${total - done}</span>
+    ${overdue > 0 ? `<span class="text-danger">逾期 ${overdue}</span>` : ''}
+    <span>今日專注 ${todayFocusMin} 分</span>
+  `;
+
+  updateTitle();
+}
+
+function populateCategoryDropdowns() {
+  const cats = getCategories();
+  const filterCat = document.getElementById('filter-category');
+  filterCat.innerHTML = '<option value="全部">全部</option>' +
+    cats.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+
+// ══ Calendar Module ══
+
+const CALENDAR_VIEW_KEY = 'taskPanel.calendarView';
+
+let calendarView = {
+  mode: 'week',
+  currentDate: new Date()
+};
+
+let draggedTaskId = null;
+
+function loadCalendarView() {
+  try {
+    const raw = localStorage.getItem(CALENDAR_VIEW_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      calendarView.mode = saved.mode || 'week';
+      if (saved.currentDate) calendarView.currentDate = new Date(saved.currentDate);
+    }
+  } catch (e) {}
+}
+
+function saveCalendarView() {
+  try {
+    localStorage.setItem(CALENDAR_VIEW_KEY, JSON.stringify({
+      mode: calendarView.mode,
+      currentDate: calendarView.currentDate.toISOString()
+    }));
+  } catch (e) {}
+}
+
+function formatDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(dateStr) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDisplayDate(dateStr) {
+  const d = parseDateKey(dateStr);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function formatMonthYear(date) {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+
+function getWeekRange(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() - day);
+  const start = new Date(d);
+  d.setDate(d.getDate() + 6);
+  const end = new Date(d);
+  return { start, end };
+}
+
+function getMonthRange(date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return { start, end };
+}
+
+function getTasksForDate(dateStr) {
+  return tasks.filter(t => t.dueDate === dateStr);
+}
+
+function isSameDay(d1, d2) {
+  return d1.getFullYear() === d2.getFullYear() &&
+         d1.getMonth() === d2.getMonth() &&
+         d1.getDate() === d2.getDate();
+}
+
+function goToPrevPeriod() {
+  const d = new Date(calendarView.currentDate);
+  if (calendarView.mode === 'week') {
+    d.setDate(d.getDate() - 7);
+  } else {
+    d.setMonth(d.getMonth() - 1);
+  }
+  calendarView.currentDate = d;
+  saveCalendarView();
+  renderCalendar();
+}
+
+function goToNextPeriod() {
+  const d = new Date(calendarView.currentDate);
+  if (calendarView.mode === 'week') {
+    d.setDate(d.getDate() + 7);
+  } else {
+    d.setMonth(d.getMonth() + 1);
+  }
+  calendarView.currentDate = d;
+  saveCalendarView();
+  renderCalendar();
+}
+
+function goToToday() {
+  calendarView.currentDate = new Date();
+  saveCalendarView();
+  renderCalendar();
+}
+
+function toggleViewMode() {
+  calendarView.mode = calendarView.mode === 'week' ? 'month' : 'week';
+  saveCalendarView();
+  renderCalendar();
+  updateViewToggleBtn();
+}
+
+function updateViewToggleBtn() {
+  const btn = document.getElementById('cal-view-toggle');
+  if (btn) {
+    btn.textContent = calendarView.mode === 'week' ? '切換月視圖' : '切換週視圖';
+  }
+}
+
+function renderCalendar() {
+  if (calendarView.mode === 'week') {
+    renderWeekView();
+  } else {
+    renderMonthView();
+  }
+  updateCalendarTitle();
+}
+
+function updateCalendarTitle() {
+  const titleEl = document.getElementById('cal-title');
+  if (!titleEl) return;
+  
+  if (calendarView.mode === 'week') {
+    const { start, end } = getWeekRange(calendarView.currentDate);
+    if (start.getMonth() === end.getMonth()) {
+      titleEl.textContent = `${start.getFullYear()}年${start.getMonth() + 1}月 第${getWeekNumber(start)}週`;
+    } else {
+      titleEl.textContent = `${formatDisplayDate(formatDateKey(start))} - ${formatDisplayDate(formatDateKey(end))}`;
+    }
+  } else {
+    titleEl.textContent = formatMonthYear(calendarView.currentDate);
+  }
+}
+
+function getWeekNumber(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
+function renderWeekView() {
+  const container = document.getElementById('calendar-week-container');
+  const monthContainer = document.getElementById('calendar-month-container');
+  if (!container) return;
+  
+  container.style.display = 'flex';
+  if (monthContainer) monthContainer.style.display = 'none';
+  
+  const today = new Date();
+  const { start, end } = getWeekRange(calendarView.currentDate);
+  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+  
+  let headerHtml = '';
+  let bodyHtml = '';
+  
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const dateStr = formatDateKey(d);
+    const isToday = isSameDay(d, today);
+    
+    headerHtml += `<div class="calendar-week-header-cell${isToday ? ' today' : ''}">
+      ${dayNames[i]} ${formatDisplayDate(dateStr)}
+    </div>`;
+    
+    const dayTasks = getTasksForDate(dateStr);
+    const tasksHtml = dayTasks.map(t => renderCalendarTask(t)).join('');
+    
+    bodyHtml += `<div class="calendar-day-cell${isToday ? ' today' : ''}" data-date="${dateStr}">
+      <div class="calendar-day-number">${d.getDate()}</div>
+      <div class="calendar-day-tasks">${tasksHtml}</div>
+    </div>`;
+  }
+  
+  container.innerHTML = `
+    <div class="calendar-week-header">${headerHtml}</div>
+    <div class="calendar-week-body">${bodyHtml}</div>
+  `;
+  
+  bindCalendarDayEvents(container);
+}
+
+function renderMonthView() {
+  const container = document.getElementById('calendar-month-container');
+  const weekContainer = document.getElementById('calendar-week-container');
+  if (!container) return;
+  
+  container.style.display = 'flex';
+  if (weekContainer) weekContainer.style.display = 'none';
+  
+  const today = new Date();
+  const { start: monthStart } = getMonthRange(calendarView.currentDate);
+  const year = monthStart.getFullYear();
+  const month = monthStart.getMonth();
+  
+  const firstDayOfMonth = new Date(year, month, 1);
+  const startDay = firstDayOfMonth.getDay();
+  
+  let html = '<div class="calendar-month-header">';
+  const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+  for (let i = 0; i < 7; i++) {
+    html += `<div class="calendar-month-header-cell">${dayNames[i]}</div>`;
+  }
+  html += '</div><div class="calendar-month-body">';
+  
+  const totalCells = 42;
+  for (let i = 0; i < totalCells; i++) {
+    const d = new Date(year, month, i - startDay + 1);
+    const dateStr = formatDateKey(d);
+    const isToday = isSameDay(d, today);
+    const isOtherMonth = d.getMonth() !== month;
+    
+    const dayTasks = getTasksForDate(dateStr);
+    const maxVisible = 3;
+    const visibleTasks = dayTasks.slice(0, maxVisible);
+    const remaining = dayTasks.length - maxVisible;
+    
+    let tasksHtml = visibleTasks.map(t => {
+      const classes = ['cal-month-task-item', `priority-${t.priority}`];
+      if (t.completed) classes.push('completed');
+      return `<div class="${classes.join(' ')}" draggable="true" data-task-id="${t.id}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</div>`;
+    }).join('');
+    
+    if (remaining > 0) {
+      tasksHtml += `<div class="cal-month-more">+${remaining} 更多</div>`;
+    }
+    
+    html += `<div class="calendar-month-day${isToday ? ' today' : ''}${isOtherMonth ? ' other-month' : ''}" data-date="${dateStr}">
+      <div class="calendar-month-date">${d.getDate()}</div>
+      <div class="calendar-month-tasks">${tasksHtml}</div>
+    </div>`;
+  }
+  
+  html += '</div>';
+  container.innerHTML = html;
+  
+  bindCalendarDayEvents(container);
+}
+
+function renderCalendarTask(task) {
+  const classes = ['cal-task', `priority-${task.priority}`];
+  if (task.completed) classes.push('completed');
+  if (isOverdue(task.dueDate) && !task.completed) classes.push('overdue');
+  if (isDueToday(task.dueDate) && !task.completed) classes.push('due-today');
+  
+  return `<div class="${classes.join(' ')}" draggable="true" data-task-id="${task.id}">
+    ${escapeHtml(task.title)}
+  </div>`;
+}
+
+function bindCalendarDayEvents(container) {
+  container.querySelectorAll('.calendar-day-cell, .calendar-month-day').forEach(cell => {
+    cell.addEventListener('click', (e) => {
+      if (e.target.closest('.cal-task, .cal-month-task-item')) return;
+      handleDayClick(cell.dataset.date);
+    });
+    
+    cell.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      cell.classList.add('drag-over');
+    });
+    
+    cell.addEventListener('dragleave', () => {
+      cell.classList.remove('drag-over');
+    });
+    
+    cell.addEventListener('drop', (e) => {
+      e.preventDefault();
+      cell.classList.remove('drag-over');
+      if (draggedTaskId) {
+        handleTaskDrop(draggedTaskId, cell.dataset.date);
+        draggedTaskId = null;
+      }
+    });
+  });
+  
+  container.querySelectorAll('.cal-task, .cal-month-task-item').forEach(taskEl => {
+    taskEl.addEventListener('dragstart', (e) => {
+      draggedTaskId = taskEl.dataset.taskId;
+      taskEl.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    
+    taskEl.addEventListener('dragend', () => {
+      taskEl.classList.remove('dragging');
+      draggedTaskId = null;
+    });
+    
+    taskEl.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      handleTaskRightClick(taskEl.dataset.taskId, e);
+    });
+    
+    taskEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+  });
+}
+
+function handleDayClick(dateStr) {
+  showQuickAdd(dateStr);
+}
+
+function showQuickAdd(dateStr) {
+  const popup = document.getElementById('cal-quick-add');
+  const dateEl = document.getElementById('cal-quick-date');
+  const titleInput = document.getElementById('cal-quick-title');
+  const catSelect = document.getElementById('cal-quick-category');
+  
+  if (!popup || !dateEl || !titleInput || !catSelect) return;
+  
+  const d = parseDateKey(dateStr);
+  dateEl.textContent = `日期：${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  dateEl.dataset.date = dateStr;
+  
+  const cats = getCategories();
+  catSelect.innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  
+  titleInput.value = '';
+  popup.classList.add('show');
+  titleInput.focus();
+}
+
+function hideQuickAdd() {
+  const popup = document.getElementById('cal-quick-add');
+  if (popup) popup.classList.remove('show');
+}
+
+function submitQuickAdd() {
+  const titleInput = document.getElementById('cal-quick-title');
+  const catSelect = document.getElementById('cal-quick-category');
+  const dateEl = document.getElementById('cal-quick-date');
+  
+  if (!titleInput || !catSelect || !dateEl) return;
+  
+  const title = titleInput.value.trim();
+  if (!title) {
+    showError('請輸入任務標題');
+    return;
+  }
+  
+  const task = {
+    id: uid(),
+    title: title,
+    category: catSelect.value,
+    priority: 'medium',
+    dueDate: dateEl.dataset.date,
+    completed: false,
+    isImportant: true,
+    isUrgent: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  
+  tasks.push(task);
+  saveTasks(tasks);
+  hideQuickAdd();
+  refreshView();
+  showToast(`已新增任務「${title}」`);
+}
+
+function handleTaskDrop(taskId, dateStr) {
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+  
+  const oldDate = task.dueDate;
+  task.dueDate = dateStr;
+  task.updatedAt = new Date().toISOString();
+  
+  saveTasks(tasks);
+  refreshView();
+  
+  const d = parseDateKey(dateStr);
+  showToast(`已移動到 ${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`);
+}
+
+function handleTaskRightClick(taskId, event) {
+  const menu = document.getElementById('cal-context-menu');
+  if (!menu) return;
+  
+  menu.dataset.taskId = taskId;
+  
+  const task = tasks.find(t => t.id === taskId);
+  if (task) {
+    document.getElementById('cal-ctx-complete').textContent = task.completed ? '標記未完成' : '標記完成';
+  }
+  
+  menu.style.left = event.clientX + 'px';
+  menu.style.top = event.clientY + 'px';
+  menu.classList.add('show');
+}
+
+function hideContextMenu() {
+  const menu = document.getElementById('cal-context-menu');
+  if (menu) menu.classList.remove('show');
+}
+
+function handleContextComplete() {
+  const menu = document.getElementById('cal-context-menu');
+  if (!menu) return;
+  
+  const taskId = menu.dataset.taskId;
+  toggleComplete(taskId);
+  hideContextMenu();
+  renderCalendar();
+}
+
+function handleContextEdit() {
+  const menu = document.getElementById('cal-context-menu');
+  if (!menu) return;
+  
+  const taskId = menu.dataset.taskId;
+  hideContextMenu();
+  switchTab('tasks');
+  setTimeout(() => enterEditMode(taskId), 100);
+}
+
+function handleContextDelete() {
+  const menu = document.getElementById('cal-context-menu');
+  if (!menu) return;
+  
+  const taskId = menu.dataset.taskId;
+  hideContextMenu();
+  deleteTask(taskId);
+}
+
+function showToast(message) {
+  const toast = document.getElementById('cal-toast');
+  if (!toast) return;
+  
+  toast.textContent = message;
+  toast.classList.add('show');
+  
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 2000);
+}
+
+function bindCalendarEvents() {
+  document.getElementById('cal-prev')?.addEventListener('click', goToPrevPeriod);
+  document.getElementById('cal-next')?.addEventListener('click', goToNextPeriod);
+  document.getElementById('cal-today')?.addEventListener('click', goToToday);
+  document.getElementById('cal-view-toggle')?.addEventListener('click', toggleViewMode);
+  
+  document.getElementById('cal-quick-add-close')?.addEventListener('click', hideQuickAdd);
+  document.getElementById('cal-quick-cancel')?.addEventListener('click', hideQuickAdd);
+  document.getElementById('cal-quick-add-btn')?.addEventListener('click', submitQuickAdd);
+  
+  document.getElementById('cal-quick-title')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitQuickAdd();
+    if (e.key === 'Escape') hideQuickAdd();
+  });
+  
+  document.getElementById('cal-ctx-complete')?.addEventListener('click', handleContextComplete);
+  document.getElementById('cal-ctx-edit')?.addEventListener('click', handleContextEdit);
+  document.getElementById('cal-ctx-delete')?.addEventListener('click', handleContextDelete);
+  
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.cal-context-menu') && !e.target.closest('.cal-task, .cal-month-task-item')) {
+      hideContextMenu();
+    }
+    if (!e.target.closest('.cal-quick-add') && !e.target.closest('.calendar-day-cell, .calendar-month-day')) {
+      hideQuickAdd();
+    }
+  });
+}
+
+function initCalendar() {
+  loadCalendarView();
+  bindCalendarEvents();
+  updateViewToggleBtn();
+  renderCalendar();
+}
+// ══ Pomodoro Module ══
+
+const POMO_SETTINGS_KEY = 'taskPanel.pomodoro';
+const POMO_LOG_KEY = 'taskPanel.pomoLog';
+const POMO_DEFAULTS = { focusMin: 25, breakMin: 5, longBreakMin: 15, rounds: 4, sound: true };
+
+let pomoSettings = loadPomoSettings();
+let pomoLog = loadPomoLog();
+let pomo = {
+  phase: 'idle',        // idle | focus | break | longbreak
+  round: 0,             // 已完成的專注回合數
+  running: false,
+  endTime: null,        // 目標時間戳（ms）
+  remainingMs: 0,
+  timerId: null,
+  category: '工作'
+};
+
+function loadPomoSettings() {
+  try {
+    const raw = localStorage.getItem(POMO_SETTINGS_KEY);
+    return raw ? { ...POMO_DEFAULTS, ...JSON.parse(raw) } : { ...POMO_DEFAULTS };
+  } catch (e) { return { ...POMO_DEFAULTS }; }
+}
+
+function loadPomoLog() {
+  try {
+    const raw = localStorage.getItem(POMO_LOG_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+function pomoPhaseMinutes() {
+  if (pomo.phase === 'break') return pomoSettings.breakMin;
+  if (pomo.phase === 'longbreak') return pomoSettings.longBreakMin;
+  return pomoSettings.focusMin; // idle 與 focus
+}
+
+function pomoPhaseLabel() {
+  return { idle: '待機', focus: '專注', break: '休息', longbreak: '長休息' }[pomo.phase] || '';
+}
+
+function fmtClock(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function beep() {
+  if (!pomoSettings.sound) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    osc.start(); osc.stop(ctx.currentTime + 0.6);
+  } catch (e) { /* 音效失敗不影響功能 */ }
+}
+
+function startPomo() {
+  if (pomo.phase === 'idle') {
+    pomo.phase = 'focus';
+    pomo.round = 0;
+    pomo.remainingMs = 0;
+  }
+  if (pomo.remainingMs <= 0) pomo.remainingMs = pomoPhaseMinutes() * 60 * 1000;
+  pomo.endTime = Date.now() + pomo.remainingMs;
+  pomo.running = true;
+  clearInterval(pomo.timerId);
+  pomo.timerId = setInterval(pomoTick, 250);
+  renderPomo();
+  refreshView();
+}
+
+function pausePomo() {
+  pomo.running = false;
+  pomo.remainingMs = pomo.endTime ? pomo.endTime - Date.now() : pomo.remainingMs;
+  clearInterval(pomo.timerId);
+  renderPomo();
+}
+
+function resetPomo() {
+  clearInterval(pomo.timerId);
+  pomo.phase = 'idle';
+  pomo.round = 0;
+  pomo.running = false;
+  pomo.endTime = null;
+  pomo.remainingMs = 0;
+  renderPomo();
+  refreshView();
+}
+
+function skipPomo() {
+  if (pomo.phase === 'idle') return;
+  advancePhase(pomo.phase === 'focus', true);
+}
+
+function pomoTick() {
+  pomo.remainingMs = pomo.endTime - Date.now();
+  if (pomo.remainingMs <= 0) {
+    advancePhase(pomo.phase === 'focus', false);
+  } else {
+    renderPomo();
+  }
+}
+
+function advancePhase(wasFocus, skipped) {
+  clearInterval(pomo.timerId);
+  if (!skipped) beep();
+  if (wasFocus && !skipped) {
+    pomo.round++;
+    pomoLog.push({
+      id: uid(),
+      category: pomo.category,
+      minutes: pomoSettings.focusMin,
+      endedAt: new Date().toISOString()
+    });
+    savePomoLog();
+  }
+  if (wasFocus) {
+    pomo.phase = pomo.round >= pomoSettings.rounds ? 'longbreak' : 'break';
+  } else if (pomo.round >= pomoSettings.rounds) {
+    resetPomo();  // 全部輪數 + 長休息結束，回到待機
+    return;
+  } else {
+    pomo.phase = 'focus';
+  }
+  pomo.running = false;
+  pomo.endTime = null;
+  pomo.remainingMs = pomoPhaseMinutes() * 60 * 1000;
+  renderPomo();
+  refreshView();
+}
+
+function savePomoLog() {
+  try { localStorage.setItem(POMO_LOG_KEY, JSON.stringify(pomoLog)); } catch (e) {}
+}
+
+function savePomoSettings() {
+  try { localStorage.setItem(POMO_SETTINGS_KEY, JSON.stringify(pomoSettings)); } catch (e) {}
+}
+
+function updateTitle() {
+  const timerActive = pomo.running || (pomo.phase !== 'idle' && pomo.remainingMs > 0);
+  if (timerActive) {
+    const ms = pomo.running ? pomo.endTime - Date.now() : pomo.remainingMs;
+    document.title = `${fmtClock(ms)} ${pomoPhaseLabel()}｜任務面板`;
+    return;
+  }
+  const allOverdue = tasks.filter(t => !t.completed && isOverdue(t.dueDate)).length;
+  document.title = allOverdue > 0 ? `任務面板（逾期 ${allOverdue}）` : '任務面板';
+}
+
+function renderPomo() {
+  const timeEl = document.getElementById('pomo-time');
+  if (!timeEl) return;
+  const phaseEl = document.getElementById('pomo-phase');
+  const dotsEl = document.getElementById('pomo-rounds');
+  const btn = document.getElementById('pomo-toggle');
+  const sec = document.getElementById('pomo-section');
+
+  const displayMs = (pomo.running || pomo.remainingMs > 0)
+    ? pomo.remainingMs
+    : pomoPhaseMinutes() * 60 * 1000;
+  timeEl.textContent = fmtClock(displayMs);
+  phaseEl.textContent = pomoPhaseLabel();
+
+  let dots = '';
+  for (let i = 0; i < pomoSettings.rounds; i++) {
+    const cls = i < pomo.round ? 'done'
+      : (i === pomo.round && pomo.phase === 'focus' ? 'current' : '');
+    dots += `<span class="pomo-dot ${cls}"></span>`;
+  }
+  dotsEl.innerHTML = dots;
+
+  btn.textContent = pomo.running ? '暫停' : (pomo.phase === 'idle' ? '開始' : '繼續');
+  sec.classList.toggle('running', pomo.running && pomo.phase === 'focus');
+  sec.classList.toggle('on-break', pomo.running && (pomo.phase === 'break' || pomo.phase === 'longbreak'));
+
+  renderMiniTimer();
+  updateTitle();
+}
+
+function populatePomoCategory() {
+  const sel = document.getElementById('pomo-category');
+  if (!sel) return;
+  const cats = getCategories();
+  if (!cats.includes(pomo.category)) pomo.category = cats[0] || '未分類';
+  sel.innerHTML = cats.map(c =>
+    `<option value="${escapeHtml(c)}" ${c === pomo.category ? 'selected' : ''}>${escapeHtml(c)}</option>`
+  ).join('');
+}
+
+function fillSettingsUI() {
+  document.getElementById('pomo-focus-min').value = pomoSettings.focusMin;
+  document.getElementById('pomo-break-min').value = pomoSettings.breakMin;
+  document.getElementById('pomo-longbreak-min').value = pomoSettings.longBreakMin;
+  document.getElementById('pomo-rounds').value = pomoSettings.rounds;
+  document.getElementById('pomo-sound').checked = pomoSettings.sound;
+}
+
+function savePomoSettingsFromUI() {
+  const clamp = (id, min, max, dflt) => {
+    let v = parseInt(document.getElementById(id).value, 10);
+    if (isNaN(v)) return dflt;
+    return Math.min(max, Math.max(min, v));
+  };
+  pomoSettings = {
+    focusMin: clamp('pomo-focus-min', 1, 120, 25),
+    breakMin: clamp('pomo-break-min', 1, 60, 5),
+    longBreakMin: clamp('pomo-longbreak-min', 1, 60, 15),
+    rounds: clamp('pomo-rounds', 1, 12, 4),
+    sound: document.getElementById('pomo-sound').checked
+  };
+  savePomoSettings();
+  resetPomo();
+  document.getElementById('pomo-settings').classList.remove('open');
+  renderPomo();
+}
+
+function bindPomoEvents() {
+  document.getElementById('pomo-toggle').addEventListener('click', () => {
+    pomo.running ? pausePomo() : startPomo();
+  });
+  document.getElementById('pomo-reset').addEventListener('click', resetPomo);
+  document.getElementById('pomo-skip').addEventListener('click', skipPomo);
+  document.getElementById('pomo-settings-btn').addEventListener('click', () => {
+    const el = document.getElementById('pomo-settings');
+    el.classList.toggle('open');
+    if (el.classList.contains('open')) fillSettingsUI();
+  });
+  document.getElementById('pomo-save-settings').addEventListener('click', savePomoSettingsFromUI);
+  document.getElementById('pomo-category').addEventListener('change', (e) => {
+    pomo.category = e.target.value;
+    if (pomo.phase === 'focus') refreshView();
+  });
+}
+
+function initPomodoro() {
+  fillSettingsUI();
+  populatePomoCategory();
+  bindPomoEvents();
+  renderPomo();
+}
+
+// ══ Pomo Summary ══
+
+function renderPomoSummary() {
+  const el = document.getElementById('pomo-summary');
+  if (!el) return;
+  const todayKey = new Date().toDateString();
+  const todayLogs = pomoLog.filter(l => new Date(l.endedAt).toDateString() === todayKey);
+  const totalMin = todayLogs.reduce((s, l) => s + l.minutes, 0);
+  const byCat = {};
+  todayLogs.forEach(l => { byCat[l.category] = (byCat[l.category] || 0) + l.minutes; });
+  const catRows = Object.entries(byCat)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, min]) => `
+      <div class="summary-row">
+        <span>${escapeHtml(cat)}</span>
+        <span>${min} 分</span>
+      </div>`).join('');
+  el.innerHTML = `
+    <div class="pomo-summary-card">
+      <div class="summary-title">今日專注紀錄</div>
+      ${todayLogs.length === 0 ? '<div class="summary-empty">今天還沒有完成的專注回合</div>' : `
+        <div class="summary-total">共 ${todayLogs.length} 回合 / ${totalMin} 分鐘</div>
+        ${catRows}`}
+    </div>
+  `;
+}
+
+// ══ Tab Navigation ══
+
+const ACTIVE_TAB_KEY = 'taskPanel.activeTab';
+let activeTab = localStorage.getItem(ACTIVE_TAB_KEY) || 'tasks';
+
+function switchTab(tab) {
+  activeTab = tab;
+  try { localStorage.setItem(ACTIVE_TAB_KEY, tab); } catch (e) {}
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-page').forEach(p =>
+    p.classList.toggle('active', p.id === 'tab-' + tab));
+  renderMiniTimer();
+}
+
+function renderMiniTimer() {
+  const mini = document.getElementById('mini-timer');
+  if (!mini) return;
+  const timerActive = pomo.running || (pomo.phase !== 'idle' && pomo.remainingMs > 0);
+  const show = activeTab !== 'pomo' && timerActive;
+  mini.classList.toggle('show', show);
+  if (show) {
+    const ms = pomo.running ? pomo.endTime - Date.now() : pomo.remainingMs;
+    document.getElementById('mini-time').textContent = fmtClock(ms);
+    document.getElementById('mini-phase').textContent = pomoPhaseLabel();
+  }
+}
+
+function bindTabEvents() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+  document.getElementById('mini-timer').addEventListener('click', () => switchTab('pomo'));
+}
+
+// ── Refresh ──
+
+function refreshView() {
+  renderCalendar();
+  populateCategoryDropdowns();
+  populatePomoCategory();
+  renderTaskView();
+  renderStats(tasks);
+  renderPomoSummary();
+}
+
+// ── Event Binding ──
+
+function bindEvents() {
+  document.getElementById('add-task-btn').addEventListener('click', addTask);
+
+  document.getElementById('task-title').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addTask();
+  });
+
+  document.querySelectorAll('.task-view-btn').forEach(btn => {
+    btn.addEventListener('click', () => setTaskView(btn.dataset.taskView));
+  });
+
+  document.getElementById('filter-category').addEventListener('change', (e) => {
+    currentFilters.category = e.target.value;
+    refreshView();
+  });
+  document.getElementById('filter-status').addEventListener('change', (e) => {
+    currentFilters.status = e.target.value;
+    refreshView();
+  });
+  document.getElementById('filter-priority').addEventListener('change', (e) => {
+    currentFilters.priority = e.target.value;
+    refreshView();
+  });
+
+  document.getElementById('sort-by').addEventListener('change', (e) => {
+    sortBy = e.target.value;
+    refreshView();
+  });
+
+  document.getElementById('sort-order').addEventListener('click', (e) => {
+    sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+    e.target.textContent = sortOrder === 'desc' ? '↓ 降序' : '↑ 升序';
+    e.target.dataset.order = sortOrder;
+    refreshView();
+  });
+}
+
+// ── Init ──
+
+function init() {
+  tasks = loadTasks();
+  loadTaskView();
+  initTheme();
+  bindEvents();
+  bindTabEvents();
+  bindModalEvents();
+  initPomodoro();
+  initCalendar();
+  refreshView();
+  switchTab(activeTab);
+}
+
+// ── 原生彈窗覆蓋率自我檢查 ──
+// 掃描自身原始碼，任何 confirm、alert、prompt 呼叫出現即警告（開發期防回歸）
+(function nativeDialogGuard() {
+  const src = document.currentScript ? document.currentScript.textContent : '';
+  const found = [];
+  if (/\bconfirm\s*\(/.test(src)) found.push('confirm');
+  if (/\balert\s*\(/.test(src)) found.push('alert');
+  if (/\bprompt\s*\(/.test(src)) found.push('prompt');
+  if (found.length > 0) {
+    console.warn('[任務面板] 偵測到原生彈窗呼叫:', found.join(', '), '— 請改用 showConfirm() 或 showError()');
+  }
+})();
+
+init();
+</script>
+</body>
+</html>
